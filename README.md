@@ -1,0 +1,157 @@
+<br><br>
+
+<p align="center">
+  <img src="assets/logos/korea_university.png" alt="Korea University" height="36">&nbsp;&nbsp;&nbsp;
+  <img src="assets/logos/MIIL_full_logo.svg" alt="MIIL" height="36">&nbsp;&nbsp;&nbsp;
+  <img src="assets/logos/naver_ai_lab.png" alt="Naver AI Lab" height="36">&nbsp;&nbsp;&nbsp;
+  <img src="assets/logos/naver_cloud.png" alt="Naver Cloud" height="36">&nbsp;&nbsp;&nbsp;
+  <img src="assets/logos/richmond_university.svg" alt="Richmond University" height="36">
+</p>
+
+<br>
+
+# <p align="center">ReSCORE: Label-free Iterative Retriever Training for Multi-hop Question Answering with Relevance-Consistency Supervision</p>
+
+<p align="center">
+  <a href="https://arxiv.org/abs/2505.21250">arXiv</a> | <a href="https://leeds1219.github.io/ReSCORE/">Project</a>
+</p>
+
+<p align="center">
+  by <a href="https://leeds1219.github.io/">Dosung Lee</a>*,
+  <a href="https://github.com/owj0421">Wonjun Oh</a>*,
+  <a href="https://bykimby.github.io/">Boyoung Kim</a>,
+  <a href="https://github.com/EuroMinyoung186">Minyoung Kim</a>,
+  <a href="http://www.mathcs.richmond.edu/~jpark/">Joonsuk Park</a>†,
+  <a href="https://miil.korea.ac.kr/">Paul Hongsuck Seo</a>†
+</p>
+
+## Introduction
+Directly mapping complex problems ($x$) to their final solutions ($y$) poses a significant challenge, often requiring an intermediate reasoning step—a latent variable ($z$)—to bridge the gap. However, explicit supervision for these intermediate thoughts is rarely available. 
+Instead of relying on ground-truth reasoning labels, our approach leverages the model's confidence in the final answer ($y$) as an intrinsic reward signal.   
+Through this approach, the model learns to autonomously generate the most effective intermediate steps ($z$) that maximize downstream solvability. 
+           
+
+This is our official implementation of ReSCORE: Label-free Iterative Retriever Training for Multi-hop Question Answering with Relevance-Consistency Supervision! 
+
+![Figure](assets/figure.png)
+Multi-hop question answering (MHQA) requires reasoning across multiple documents, making dense retriever training challenging due to query variability. We propose ReSCORE, a method that trains dense retrievers without labeled data by leveraging LLMs to assess document relevance and consistency with answers.
+
+For further details, please check out our [Paper](https://arxiv.org/abs/2505.21250) and our [Project](https://leeds1219.github.io/ReSCORE/) page.
+
+## Demo
+Move the app.py from demo folder to ReSCORE dir.
+```
+python app.py
+
+"""
+Examples)
+
+Which company owns the manufacturer of Learjet 60?
+
+In which county is Southern Maryland Electric Cooperative headquartered?
+
+What is another notable work made by the author of Miss Sara Sampson?
+
+What is the seat of the county where Van Hook Township is located?
+
+The Unwinding author volunteered for which organisation?
+
+...
+"""
+```
+
+## :fire:TODO
+- [ ] Check Typo ...
+
+## Installation
+```
+pip install -r requirements.txt
+```
+
+You need permission to access the [Llama-3.1-8B-Instruct](https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct) model, or you can modify the [Script](/source/module/generate/llama.py) to use your own LLM.
+
+We conducted all experiments using Python 3.10.12 on an NVIDIA A100 HBM2 40GB PCIe GPU, and the environments are listed in [Packages](./my_packages.txt), so please refer to it if any issues arise.
+
+## Data Preparation
+```bash
+# Download MHQA datasets
+sh script/download/multihop_raw_data.sh
+
+# Preprocess and build Retrieval DB
+sh script/download/build.sh
+```
+
+## Training
+```
+# Training
+python -m source.run.train
+--running_name {train}
+--dataset {dataset}
+```
+
+<!--<img src="assets/loss.png" width="50%" />
+We selected the checkpoints corresponding to the lowest validation loss within a single epoch.-->
+
+#### Model Weights
+| Model Weights | Link |
+|--------------|------|
+| Contriever-MSMARCO | [🔗 Click here](https://huggingface.co/facebook/contriever-msmarco) |
+| IQATR-Musique | [🔗 Click here](https://huggingface.co/Lee1219/iqatr-musique) |
+| IQATR-HotpotQA | [🔗 Click here](https://huggingface.co/Lee1219/iqatr-hotpotqa) |
+| IQATR-2WikiMultiHopQA | [🔗 Click here](https://huggingface.co/Lee1219/iqatr-2wikimhqa) |
+
+## Inference
+```
+# Inference
+python -m source.run.inference
+--method {base_or_iqatr}
+--running_name {inference}
+--dataset {dataset}
+```
+
+## Acknowledgement
+This project includes code from [Contriever](https://github.com/facebookresearch/contriever), [DPR](https://github.com/facebookresearch/DPR), and [IRCoT](https://github.com/StonyBrookNLP/ircot).
+
+This research was supported by the following grants:
+
+- **IITP (Institute of Information & Communications Technology Planning & Evaluation)**  
+  - IITP-2025-RS-2020-II201819  
+  - IITP-2025-RS-2024-00436857  
+  - IITP-2025-RS-2024-00398115  
+  - IITP-2025-RS-2025-02263754  
+  - IITP-2025-RS-2025-02304828
+
+- **NRF (National Research Foundation of Korea)**  
+  - NRF-2021R1A6A1A03045425
+
+- **KOCCA (Korea Creative Content Agency)**  
+  - RS-2024-00345025
+
+Funded by the Korea government (**MSIT**, **MOE**, and **MSCT**).
+
+## Citation
+```BibTeX
+@inproceedings{lee-etal-2025-rescore,
+    title = "{R}e{SCORE}: Label-free Iterative Retriever Training for Multi-hop Question Answering with Relevance-Consistency Supervision",
+    author = "Lee, Dosung  and
+      Oh, Wonjun  and
+      Kim, Boyoung  and
+      Kim, Minyoung  and
+      Park, Joonsuk  and
+      Seo, Paul Hongsuck",
+    editor = "Che, Wanxiang  and
+      Nabende, Joyce  and
+      Shutova, Ekaterina  and
+      Pilehvar, Mohammad Taher",
+    booktitle = "Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)",
+    month = jul,
+    year = "2025",
+    address = "Vienna, Austria",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2025.acl-long.16/",
+    doi = "10.18653/v1/2025.acl-long.16",
+    pages = "341--359",
+    ISBN = "979-8-89176-251-0",
+    abstract = "Multi-hop question answering (MHQA) involves reasoning across multiple documents to answer complex questions. Dense retrievers typically outperform sparse methods like BM25 by leveraging semantic embeddings in many tasks; however, they require labeled query-document pairs for fine-tuning, which poses a significant challenge in MHQA due to the complexity of the reasoning steps. To overcome this limitation, we introduce Retriever Supervision with Consistency and Relevance (ReSCORE), a novel method for training dense retrievers for MHQA without the need for labeled documents. ReSCORE leverages large language models to measure document-question relevance with answer consistency and utilizes this information to train a retriever within an iterative question-answering framework. Evaluated on three MHQA benchmarks, our extensive experiments demonstrate the effectiveness of ReSCORE, with significant improvements in retrieval performance that consequently lead to state-of-the-art Exact Match and F1 scores for MHQA."
+}
+```

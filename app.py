@@ -1,0 +1,288 @@
+import gradio as gr
+from source.pipeline.config import PipelineConfig
+from source.pipeline.controller import PipelineController
+from source.pipeline.step.retrieval import RetrievalStep
+from source.pipeline.step.generation import (
+    GenerationStep, 
+    AnswerGenerateOutputParser, 
+    AnswerGeneratePromptGenerator,
+    ThoughtGenerateOutputParser,
+    ThoughtGeneratePromptGenerator,
+)
+from source.pipeline.step.end import EndStep
+from source.pipeline.state import QuestionState
+# from source.module.generate.llama import LlamaGenerator, LlamaGeneratorConfig
+from source.module.retrieve.dense import DenseRetriever, DenseRetrieverConfig
+from source.module.index.index import Indexer, IndexerConfig
+from source.utility.system_utils import seed_everything
+
+from huggingface_hub import login
+
+# login(token=f"{your_hf_token}")
+
+# Add your OpenRouter API key to the environment variables before running the app
+#------------------------------
+import os
+from source.module.generate.openrouter_api import (
+    OpenRouterGenerator,
+    OpenRouterGeneratorConfig,
+)
+#------------------------------
+
+seed_everything(100)
+
+cfg = PipelineConfig(
+    # 필요한 최소 설정
+    method="base",
+    batch_size=1,
+    generation_model_name='meta-llama/Meta-Llama-3.1-8B-Instruct',
+    generation_max_batch_size=1,
+    generation_max_total_tokens=4096,
+    generation_max_new_tokens=64,
+    generation_min_new_tokens=1,
+    retrieval_count=8,
+    retrieval_query_type='full',
+    dataset='musique',
+    max_num_thought=6,
+    answer_regex=".* answer is:? (.*)\\.?"
+)
+
+# generator = LlamaGenerator(
+#     LlamaGeneratorConfig(
+#         model_name=cfg.generation_model_name,
+#         batch_size=cfg.generation_max_batch_size,
+#         max_total_tokens=cfg.generation_max_total_tokens,
+#         max_new_tokens=cfg.generation_max_new_tokens,
+#         min_new_tokens=cfg.generation_min_new_tokens,
+#         use_vllm=False, #True
+#         gpu=0,
+#     )
+# )
+
+# New generator
+#------------------------------
+generator = OpenRouterGenerator(
+    OpenRouterGeneratorConfig(
+        model_name=os.getenv(
+            "OPENROUTER_MODEL",
+            "meta-llama/llama-3.2-3b-instruct:free"
+        ),
+        batch_size=cfg.generation_max_batch_size,
+        max_new_tokens=cfg.generation_max_new_tokens,
+        temperature=0.0,
+    )
+)
+#------------------------------
+
+retriever = DenseRetriever(
+    DenseRetrieverConfig(
+        query_model_name_or_path='facebook/contriever-msmarco',
+        passage_model_name_or_path=None,
+        batch_size=32,
+        training_strategy=None,
+        use_fp16=False
+    )
+)
+
+indexer = Indexer.load_local(
+    IndexerConfig(
+        embedding_sz=768,
+        database_path=cfg.database_path
+    )
+)
+
+pipeline = [
+    RetrievalStep(cfg=cfg, retriever=retriever, indexer=indexer),
+    GenerationStep(cfg=cfg, generator=generator,
+                   prompt_generator=AnswerGeneratePromptGenerator(cfg),
+                   output_parser=AnswerGenerateOutputParser(cfg)),
+    EndStep(cfg=cfg),
+    GenerationStep(cfg=cfg, generator=generator,
+                   prompt_generator=ThoughtGeneratePromptGenerator(cfg),
+                   output_parser=ThoughtGenerateOutputParser(cfg)),
+]
+
+controller = PipelineController(
+    pipeline=pipeline,
+    logging_file_path=None,
+    prediction_file_path=None
+)
+
+# # ----------------------------------------------------------
+# # Gradio UI
+# # ----------------------------------------------------------
+import gradio as gr
+
+
+def run_pipeline(user_input):
+    global controller
+    global QuestionState
+
+    logs = []
+
+    DOCS_PER_LINE = 5
+
+    def log_docs(hop, docs):
+        titles = [doc.metadata['title'] for doc in docs]
+        line = " | ".join(titles[:DOCS_PER_LINE])
+        if len(titles) > DOCS_PER_LINE:
+            line += " | ..."
+        return f"--- {hop}-hop Retrieved Documents ---\n{line}"
+
+    start_state = QuestionState(question_id="1", question=user_input)
+
+    # 1-hop
+    controller.update([start_state])
+    paths = controller.next()
+
+    next_states = controller.pipeline[0](paths)
+    logs.append(log_docs(1, next_states[0].documents))
+    # logs.append("...")
+
+    controller.update(next_states)
+    paths = controller.next()
+
+    next_states = controller.pipeline[1](paths)
+    logs.append(f"1-hop Answer: {next_states[0].answer}")
+
+    if next_states[0].answer != "Unknown":
+        logs.append("1-hop answer obtained, proceeding with verification hop.")
+        next_states[0].answer = "Unknown"
+
+    controller.update(next_states)
+    paths = controller.next()
+
+    next_states = controller.pipeline[2](paths)
+    controller.update(next_states)
+    paths = controller.next()
+
+    next_states = controller.pipeline[3](paths)
+    logs.append(f"1-hop Thought: {next_states[0].thought}")
+
+    controller.update(next_states)
+    paths = controller.next()
+
+    MAX_HOPS = 6
+    hop = 2
+
+    while hop <= MAX_HOPS:
+        next_states = controller.pipeline[0](paths)
+        logs.append(log_docs(hop, next_states[0].documents))
+        # logs.append("...")
+
+        controller.update(next_states)
+        paths = controller.next()
+
+        next_states = controller.pipeline[1](paths)
+        logs.append(f"{hop}-hop Answer: {next_states[0].answer}")
+
+        if next_states[0].answer != "Unknown":
+            break
+
+        controller.update(next_states)
+        paths = controller.next()
+
+        next_states = controller.pipeline[2](paths)
+        controller.update(next_states)
+        paths = controller.next()
+
+        next_states = controller.pipeline[3](paths)
+        logs.append(f"{hop}-hop Thought: {next_states[0].thought}")
+
+        controller.update(next_states)
+        paths = controller.next()
+
+        hop += 1
+
+    return "\n\n".join(logs)
+
+
+import gradio as gr
+
+def demo_ui():
+    with gr.Blocks() as demo:
+
+        gr.Markdown(
+            """
+            <h1 style="text-align:center; margin-bottom: 5px;">
+                Multi-hop Retrieval Pipeline Demo
+            </h1>
+            <hr style="margin-top: 0; margin-bottom: 25px;">
+            """
+        )
+
+        with gr.Column(elem_id="main-area"):
+
+            question_box = gr.Textbox(
+                label="Question",
+                value="Where was the author of Hannibal and Scipio educated at?",
+                lines=2,
+                elem_id="question-box"
+            )
+
+            run_btn = gr.Button("Run Pipeline", variant="primary")
+
+            output_box = gr.Textbox(
+                label="Multi-hop reasoning process",
+                lines=40,
+                elem_id="output-box"
+            )
+
+        run_btn.click(
+            fn=run_pipeline,
+            inputs=question_box,
+            outputs=output_box,
+        )
+
+        gr.HTML(
+            """
+            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+            <style>
+                #main-area {
+                    max-width: 1200px;
+                    margin: 0 auto;
+                }
+
+                #question-box textarea {
+                    font-family: 'Inter', sans-serif !important;
+                    font-size: 16px !important;
+                }
+
+                #output-box textarea {
+                    font-family: monospace !important;
+                    font-size: 14px !important;
+                    line-height: 1.4 !important;
+                }
+
+                .gr-button {
+                    font-family: 'Inter', sans-serif !important;
+                    background-color: #007bff !important;
+                    color: white !important;
+                    border-radius: 8px !important;
+                    padding: 10px 20px !important;
+                    font-size: 16px !important;
+                    margin: 10px 0 20px 0 !important;
+                }
+
+                #question-box, #output-box {
+                    border: 1px solid #ddd !important;
+                    border-radius: 8px !important;
+                    padding: 10px !important;
+                    box-shadow: 1px 1px 5px rgba(0,0,0,0.05);
+                }
+
+                hr {
+                    border: none;
+                    height: 1px;
+                    background: #ddd;
+                }
+            </style>
+            """
+        )
+
+    return demo
+
+if __name__ == "__main__":
+    demo = demo_ui()
+    demo.launch(share=True)
+

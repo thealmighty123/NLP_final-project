@@ -1,0 +1,10 @@
+data/
+.venv/
+__pycache__/
+.ipynb_checkpoints/
+*.pt
+*.pth
+*.pkl
+*.bin
+*.zip
+*.tar.gz
