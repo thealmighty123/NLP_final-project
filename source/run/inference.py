@@ -1,7 +1,7 @@
 from source.utility.data_utils import (
     load_data_from_jsonl
 )
-from source.pipeline.step.__retrieval import RetrievalStep
+from source.pipeline.step.retrieval import RetrievalStep
 from source.pipeline.step.generation import (
     GenerationStep, 
     AnswerGenerateOutputParser, 
