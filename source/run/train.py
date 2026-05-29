@@ -323,6 +323,13 @@ if __name__ == '__main__':
         max_total_tokens=opt.generation_max_total_tokens,
         max_new_tokens=opt.generation_max_new_tokens,
         min_new_tokens=opt.generation_min_new_tokens,
+        # model_name=os.getenv(
+        #     "OPENROUTER_MODEL",
+        #     "openai/gpt-oss-120b:free"
+        # ),
+        # batch_size=1,
+        # max_new_tokens=cfg.generation_max_new_tokens,
+        # temperature=0.0,
         )
     )
 

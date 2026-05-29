@@ -11,10 +11,16 @@ from source.module.generate.base import BaseGenerator, BaseGeneratorConfig
 
 @dataclass
 class OpenRouterGeneratorConfig(BaseGeneratorConfig):
-    model_name: Optional[str] = os.getenv("OPENROUTER_MODEL", "openrouter/free")
+    model_name: Optional[str] = os.getenv("OPENROUTER_MODEL", "openai/gpt-oss-120b:free")
     max_new_tokens: Optional[int] = 128
     temperature: Optional[float] = 0.0
 
+    # thêm để tránh lỗi khi train.py truyền từ config Llama cũ
+    max_total_tokens: Optional[int] = None
+    min_new_tokens: Optional[int] = None
+    use_vllm: Optional[bool] = None
+    gpu: Optional[int] = None
+    tensor_parallel_size: Optional[int] = None
 
 class OpenRouterGenerator(BaseGenerator):
     def __init__(self, cfg: OpenRouterGeneratorConfig = OpenRouterGeneratorConfig()):
