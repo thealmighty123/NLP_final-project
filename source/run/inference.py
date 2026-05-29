@@ -209,6 +209,12 @@ if __name__ == '__main__':
         default=1,
         help="Minimum new tokens for generation"
     )
+    parser.add_argument(
+        "--generation_tensor_parallel_size",
+        type=int,
+        default=1,
+        help="Tensor parallel size to use for generation"
+    )
 
     # Retrieval
     parser.add_argument(
@@ -320,6 +326,7 @@ if __name__ == '__main__':
         OpenRouterGeneratorConfig(
             model_name=os.getenv("OPENROUTER_MODEL", "openai/gpt-oss-120b:free"),
             batch_size=opt.generation_max_batch_size,
+            tensor_parallel_size=opt.generation_tensor_parallel_size,
             max_total_tokens=opt.generation_max_total_tokens,
             max_new_tokens=opt.generation_max_new_tokens,
             min_new_tokens=opt.generation_min_new_tokens,

@@ -1,5 +1,6 @@
 import os
 import torch
+from torch.nn import DataParallel
 import transformers
 from transformers import BertModel, XLMRobertaModel, AutoModel, AutoTokenizer
 from dataclasses import dataclass
@@ -38,6 +39,7 @@ class DenseRetrieverConfig(BaseRetrieverConfig):
     pooling: Optional[Literal['average', 'cls']] = 'average'
     max_length: Optional[int] = 512
     normalize: Optional[bool] = False
+    device_ids: Optional[List[int]] = None
 
 
 class DenseRetriever(BaseRetriever):
@@ -47,7 +49,12 @@ class DenseRetriever(BaseRetriever):
         cfg: DenseRetrieverConfig = DenseRetrieverConfig()
     ):
         self.cfg = cfg
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device_ids = cfg.device_ids if cfg.device_ids is not None else (
+            list(range(torch.cuda.device_count())) if torch.cuda.is_available() else None
+        )
+        self.device = torch.device(
+            f"cuda:{self.device_ids[0]}" if self.device_ids and torch.cuda.is_available() else "cpu"
+        )
         
         assert self.cfg.query_model_name_or_path != None, (
             "You must specify query model name."
@@ -59,38 +66,44 @@ class DenseRetriever(BaseRetriever):
         self.query_tokenizer = AutoTokenizer.from_pretrained(
             self.cfg.query_model_name_or_path
         )
-        self.query_model = self.query_model.to(self.device)
-        if self.cfg.passage_model_name_or_path != None:
-            self.query_model = AutoModel.from_pretrained(
+
+        if self.cfg.passage_model_name_or_path is not None:
+            self.passage_model = AutoModel.from_pretrained(
                 self.cfg.passage_model_name_or_path
             )
-            self.query_tokenizer = AutoTokenizer.from_pretrained(
+            self.passage_tokenizer = AutoTokenizer.from_pretrained(
                 self.cfg.passage_model_name_or_path
             )
-            self.passage_model = self.passage_model.to(self.device)
         else:
             self.passage_model = copy.deepcopy(self.query_model)
             self.passage_tokenizer = self.query_tokenizer
         
-            
         if self.cfg.training_strategy == 'both':
-            self.query_model = self.query_model.train()
-            self.passage_model = self.passage_model.train()
+            self.query_model.train()
+            self.passage_model.train()
             
         elif self.cfg.training_strategy == 'query_only':
-            self.query_model = self.query_model.train()
-            self.passage_model = self.passage_model.eval()
+            self.query_model.train()
+            self.passage_model.eval()
             
             if self.cfg.use_fp16:
                 self.passage_model = self.passage_model.half()
             
         else:
-            self.query_model = self.query_model.eval()
-            self.passage_model = self.passage_model.eval()
+            self.query_model.eval()
+            self.passage_model.eval()
             
             if self.cfg.use_fp16:
                 self.query_model = self.query_model.half()
                 self.passage_model = self.passage_model.half()
+
+        self.query_model = self.query_model.to(self.device)
+        self.passage_model = self.passage_model.to(self.device)
+
+        if self.device_ids is not None and len(self.device_ids) > 1:
+            self.query_model = DataParallel(self.query_model, device_ids=self.device_ids)
+            self.passage_model = DataParallel(self.passage_model, device_ids=self.device_ids)
+            print(f"Using DataParallel on GPUs: {self.device_ids}")
 
     def _embed_passages(
         self,

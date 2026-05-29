@@ -62,11 +62,12 @@ class LlamaGenerator(BaseGenerator):
             self.device = torch.device(f'cuda:{self.cfg.gpu}' if torch.cuda.is_available() else 'cpu')
 
         if self.cfg.use_vllm: 
+            tensor_parallel_size = self.cfg.tensor_parallel_size if self.cfg.tensor_parallel_size is not None else torch.cuda.device_count()
             self.model = LLM( 
                 model=self.cfg.model_name, 
                 gpu_memory_utilization=self.cfg.gpu_memory_utilization, 
                 max_model_len=self.cfg.max_total_tokens, 
-                tensor_parallel_size=torch.cuda.device_count(),
+                tensor_parallel_size=tensor_parallel_size,
                 device=self.device,
                 # enable_prefix_caching=True
             )

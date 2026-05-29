@@ -6,8 +6,8 @@ from tqdm import tqdm
 
 @dataclass
 class BaseGeneratorConfig:
-    batch_size: Optional[int] = 4 # 
-    # tensor_parallel_size: Optional[int] = None
+    batch_size: Optional[int] = 4
+    tensor_parallel_size: Optional[int] = None
 
 class BaseGenerator(ABC):
     

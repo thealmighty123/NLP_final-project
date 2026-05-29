@@ -12,7 +12,9 @@ from source.module.generate.base import BaseGenerator, BaseGeneratorConfig
 @dataclass
 class OpenRouterGeneratorConfig(BaseGeneratorConfig):
     model_name: Optional[str] = os.getenv("OPENROUTER_MODEL", "openrouter/free")
+    max_total_tokens: Optional[int] = 4096
     max_new_tokens: Optional[int] = 128
+    min_new_tokens: Optional[int] = 1
     temperature: Optional[float] = 0.0
 
 

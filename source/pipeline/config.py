@@ -60,6 +60,7 @@ class PipelineConfig:
     generation_max_total_tokens: Optional[int] = 4096
     generation_max_new_tokens: Optional[int] = 64
     generation_min_new_tokens: Optional[int] = 1
+    generation_tensor_parallel_size: Optional[int] = 1
     
     # Retrieval
     retrieval_query_type: Optional[
@@ -100,6 +101,7 @@ class PipelineConfig:
     temperature_lm: float = 1.
     gradient_accumulation_steps: int = 1
     wandb_key: Optional[str] = None
+    gpu_ids: Optional[List[int]] = None
 
     def __post_init__(self):
         seed_everything(self.seed)

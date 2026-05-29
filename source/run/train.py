@@ -126,6 +126,18 @@ def parse_args():
     parser.add_argument('--temperature_lm', type=float, default=1.0, help='Temperature for language model')
     parser.add_argument('--gradient_accumulation_steps', type=int, default=4, help='Gradient accumulation steps')
     parser.add_argument('--wandb_key', type=str, default=None, help='WandB API key')
+    parser.add_argument(
+        '--gpu_ids',
+        type=lambda s: [int(x) for x in s.split(',')] if s else None,
+        default=None,
+        help='Comma-separated GPU ids to use for training (e.g. 0,1)'
+    )
+    parser.add_argument(
+        '--generation_tensor_parallel_size',
+        type=int,
+        default=1,
+        help='Tensor parallel size to use for generation'
+    )
 
     args = parser.parse_args()
     
@@ -320,6 +332,7 @@ if __name__ == '__main__':
     OpenRouterGeneratorConfig(
         model_name=os.getenv("OPENROUTER_MODEL", "openai/gpt-oss-120b:free"),
         batch_size=opt.generation_max_batch_size,
+        tensor_parallel_size=opt.generation_tensor_parallel_size,
         max_total_tokens=opt.generation_max_total_tokens,
         max_new_tokens=opt.generation_max_new_tokens,
         min_new_tokens=opt.generation_min_new_tokens,
@@ -333,6 +346,7 @@ if __name__ == '__main__':
             batch_size=opt.retrieval_batch_size,
             training_strategy=opt.retrieval_training_strategy,
             use_fp16=opt.retrieval_use_fp16,
+            device_ids=opt.gpu_ids,
         )
     )
     indexer = Indexer.load_local(
