@@ -85,10 +85,27 @@ class TrainStep:
         self.retriever = retriever
         self.indexer = indexer
         
-        with open(self.cfg.qa_gen_input_prompt_file_path, 'r', encoding='utf-8') as file:
-            self.prompt_template = file.read()
-        with open(self.cfg.qa_gen_output_prompt_file_path, 'r', encoding='utf-8') as file:
-            self.answer_template = file.read()
+        self.prompt_template = self._read_prompt(self.cfg.qa_gen_input_prompt_file_path)
+        self.answer_template = self._read_prompt(self.cfg.qa_gen_output_prompt_file_path)
+
+    def _read_prompt(self, file_path):
+        if not os.path.exists(file_path):
+            prompt_root = os.path.join('.', 'prompts')
+            available_prompt_sets = []
+            if os.path.isdir(prompt_root):
+                available_prompt_sets = sorted(
+                    name for name in os.listdir(prompt_root)
+                    if name.startswith('prompt_set__')
+                )
+            available = ', '.join(available_prompt_sets) or 'none'
+            raise FileNotFoundError(
+                f"Prompt file not found: {file_path}. "
+                f"Available prompt sets: {available}. "
+                "Pass --prompt_set with an existing prompt set or add the missing prompt files."
+            )
+
+        with open(file_path, 'r', encoding='utf-8') as file:
+            return file.read()
             
     def formatting(
         self,

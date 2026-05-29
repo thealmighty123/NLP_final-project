@@ -86,6 +86,7 @@ class Indexer(object):
         )
         # Load Index
         faiss_index = faiss.read_index(index_path)
+        cfg.embedding_sz = faiss_index.d
         # Load Docstore
         docstore = Docstore.load(cfg.database_path)
         # Load index_to_docstore_id
@@ -112,7 +113,7 @@ class Indexer(object):
             cfg=cfg
         )
         print(
-            f" Deserializing Complete!"
+            f" Deserializing Complete! dim={faiss_index.d}"
         )
         
         return obj
@@ -159,8 +160,8 @@ class Indexer(object):
         if len(embeddings.shape) == 1:
             embeddings = embeddings[np.newaxis, :]
             
-        assert embeddings.shape[1] == self.cfg.embedding_sz, (
-            f"[{Indexer:^16}] Embedding size {embeddings.shape[1]} doesn't match indexer embedding size {self.cfg.embedding_sz}."
+        assert embeddings.shape[1] == self.faiss_index.d, (
+            f"[{'Indexer':^16}] Embedding size {embeddings.shape[1]} doesn't match indexer embedding size {self.faiss_index.d}."
         )
         
         embeddings = embeddings.astype('float32')
@@ -230,6 +231,17 @@ class Indexer(object):
         assert query_embeddings.dtype == np.float32, (
             f"[{'Indexer':^16}] Vectors must be of type float32"
         )
+        if len(query_embeddings.shape) != 2:
+            raise ValueError(
+                f"[{'Indexer':^16}] Query embeddings must be 2D, got shape {query_embeddings.shape}."
+            )
+        if query_embeddings.shape[1] != self.faiss_index.d:
+            raise ValueError(
+                f"[{'Indexer':^16}] Query embedding dim {query_embeddings.shape[1]} "
+                f"doesn't match FAISS index dim {self.faiss_index.d} at {self.database_path}. "
+                "Rebuild this index with the same retrieval model used for inference/training, "
+                "or pass the retrieval model that was used to build the existing index."
+            )
 
         outputs = []
         i, n_total = 0, len(query_embeddings)

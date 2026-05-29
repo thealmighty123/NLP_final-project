@@ -61,10 +61,10 @@ class DenseRetriever(BaseRetriever):
         )
         self.query_model = self.query_model.to(self.device)
         if self.cfg.passage_model_name_or_path != None:
-            self.query_model = AutoModel.from_pretrained(
+            self.passage_model = AutoModel.from_pretrained(
                 self.cfg.passage_model_name_or_path
             )
-            self.query_tokenizer = AutoTokenizer.from_pretrained(
+            self.passage_tokenizer = AutoTokenizer.from_pretrained(
                 self.cfg.passage_model_name_or_path
             )
             self.passage_model = self.passage_model.to(self.device)

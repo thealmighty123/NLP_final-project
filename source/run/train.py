@@ -83,7 +83,7 @@ def parse_args():
     parser.add_argument('--pipeline_type', choices=['single_retrieval', 'multi_retrieval', 'no_retrieval'], default='multi_retrieval', help='Pipeline type')
 
     # Prompt Config
-    parser.add_argument('--prompt_set', type=int, default=26, help='Prompt set')
+    parser.add_argument('--prompt_set', type=int, default=1, help='Prompt set')
     parser.add_argument('--prompt_document_from', choices=['last_only', 'full'], default='last_only', help='Document selection for prompts')
     parser.add_argument('--prompt_max_para_count', type=int, default=15, help='Max paragraph count')
     parser.add_argument('--prompt_max_para_words', type=int, default=350, help='Max words per paragraph')
@@ -127,9 +127,7 @@ def parse_args():
     parser.add_argument('--gradient_accumulation_steps', type=int, default=4, help='Gradient accumulation steps')
     parser.add_argument('--wandb_key', type=str, default=None, help='WandB API key')
 
-    args = parser.parse_args()
-    
-    return PipelineConfig(**vars(args))
+    return parser.parse_args()
 
 def get_pipeline(cfg, contexts, generator, retriever, indexer):
     if cfg.pipeline_type == 'no_retrieval':

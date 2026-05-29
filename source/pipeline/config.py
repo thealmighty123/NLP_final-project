@@ -106,7 +106,7 @@ class PipelineConfig:
         
         if self.method == "iqatr":
             self.min_num_thought = 1
-        elif self.method == "base":
+        elif self.method in {"base", "rescore"}:
             self.min_num_thought = 0
         else:
             print("Not Implemented")

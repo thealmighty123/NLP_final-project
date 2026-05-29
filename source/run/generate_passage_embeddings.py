@@ -42,9 +42,9 @@ def main(args):
     
     cfg = DenseRetrieverConfig(
         batch_size=args.per_gpu_batch_size,
-        training_strategy='query_only',
+        training_strategy=None,
         use_fp16=False,
-        query_model_name_or_path='facebook/contriever-msmarco',
+        query_model_name_or_path=args.model_name_or_path,
     )
     
     retriever = DenseRetriever(
@@ -70,7 +70,7 @@ def main(args):
     
     embeddings = retriever.embed(
         input_texts=passages,
-        input_type='passsage'
+        input_type='passage'
     )
     embeddings = embeddings.detach().cpu().numpy()
     
