@@ -319,9 +319,10 @@ if __name__ == '__main__':
     generator = OpenRouterGenerator(
     OpenRouterGeneratorConfig(
         model_name=os.getenv("OPENROUTER_MODEL", "openai/gpt-oss-120b:free"),
-        batch_size=1,
-        max_new_tokens=128,
-        temperature=0.0,
+        batch_size=opt.generation_max_batch_size,
+        max_total_tokens=opt.generation_max_total_tokens,
+        max_new_tokens=opt.generation_max_new_tokens,
+        min_new_tokens=opt.generation_min_new_tokens,
         )
     )
 

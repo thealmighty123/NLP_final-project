@@ -10,10 +10,16 @@ from source.utility.data_utils import (
 from source.utility.system_utils import (
     seed_everything,
 )
-from source.module.generate.llama import (
-    LlamaGenerator,
-    LlamaGeneratorConfig
+# from source.module.generate.llama import (
+#     LlamaGenerator,
+#     LlamaGeneratorConfig
+# )
+
+from source.module.generate.openrouter_api import (
+    OpenRouterGenerator,
+    OpenRouterGeneratorConfig,
 )
+
 from source.module.retrieve.dense import (
     DenseRetriever,
     DenseRetrieverConfig
@@ -146,20 +152,47 @@ class TrainStep:
             dim=-1
         ).view(B, N, 1)
 
+        # lm_score = torch.tensor(
+        #     self.generator.score(prompts, answers),
+        #     device=query_embeddings.device
+        # ).view(B, N, 1)
+
+        # retriever_likelihood = F.log_softmax(
+        #     r_score / self.cfg.temperature_r, 
+        #     dim=1
+        # )
+
+        # lm_likelihood = F.softmax(
+        #     -lm_score / self.cfg.temperature_lm, 
+        #     dim=1
+        # )
+
+        scores = []
+
+        for prompt, answer, doc in zip(prompts, answers, documents):
+            s = self.generator.score_document(
+                question=prompt,
+                answer=answer,
+                document=str(doc)
+            )
+            scores.append(s)
+
         lm_score = torch.tensor(
-            self.generator.score(prompts, answers),
+            scores,
+            dtype=torch.float32,
             device=query_embeddings.device
         ).view(B, N, 1)
 
         retriever_likelihood = F.log_softmax(
-            r_score / self.cfg.temperature_r, 
+            r_score / self.cfg.temperature_r,
             dim=1
         )
 
         lm_likelihood = F.softmax(
-            -lm_score / self.cfg.temperature_lm, 
+            lm_score / self.cfg.temperature_lm,
             dim=1
         )
+
 
         loss = F.kl_div(
             retriever_likelihood, lm_likelihood, 

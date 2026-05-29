@@ -15,6 +15,12 @@ from source.utility.system_utils import (
 #     LlamaGenerator,
 #     LlamaGeneratorConfig
 # ) 
+
+from source.module.generate.openrouter_api import (
+    OpenRouterGenerator,
+    OpenRouterGeneratorConfig,
+)
+
 from source.module.retrieve.dense import (
     DenseRetriever,
     DenseRetrieverConfig
