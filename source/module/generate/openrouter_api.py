@@ -36,7 +36,10 @@ class OpenRouterGenerator(BaseGenerator):
         outputs = []
 
         for prompt in input_texts:
-            for attempt in range(5):
+
+            completion = None
+
+            for attempt in range(100):
                 try:
                     completion = self.client.chat.completions.create(
                         model=self.cfg.model_name,
@@ -51,21 +54,51 @@ class OpenRouterGenerator(BaseGenerator):
                                     "No markdown. No explanation."
                                 ),
                             },
-                            {"role": "user", "content": prompt},
+                            {
+                                "role": "user",
+                                "content": prompt,
+                            },
                         ],
                         temperature=self.cfg.temperature,
                         max_tokens=self.cfg.max_new_tokens,
                     )
-                    break
-                except Exception as e:
-                    if "429" in str(e) or "rate" in str(e).lower():
-                        time.sleep(35 + 10 * attempt)
-                    else:
-                        raise
-            else:
-                raise RuntimeError("OpenRouter rate limit persisted after retries.")
 
-            outputs.append(self._clean_output(completion.choices[0].message.content or ""))
+                    break
+
+                except Exception as e:
+
+                    err = str(e).lower()
+
+                    if (
+                        "429" in err
+                        or "rate" in err
+                        or "503" in err
+                        or "capacity" in err
+                        or "backend" in err
+                        or "service unavailable" in err
+                    ):
+                        wait = min(60, 5 * (attempt + 1))
+
+                        print(
+                            f"[Judge Retry {attempt+1}/10] "
+                            f"waiting {wait}s because: {e}"
+                        )
+
+                        time.sleep(wait)
+                        continue
+
+                    raise
+
+            if completion is None:
+                raise RuntimeError(
+                    "OpenRouter failed after 10 retries."
+                )
+
+            outputs.append(
+                self._clean_output(
+                    completion.choices[0].message.content or ""
+                )
+            )
 
         return outputs
 
