@@ -36,11 +36,25 @@ class OpenRouterGenerator(BaseGenerator):
         text = re.sub(r"\\s*```$", "", text)
         return text.strip()
 
+    def _is_retryable_error(self, error: Exception) -> bool:
+        error_text = str(error).lower()
+        return (
+            "429" in error_text
+            or "rate" in error_text
+            or "503" in error_text
+            or "capacity_error" in error_text
+            or "no backends available" in error_text
+            or "provider returned error" in error_text
+        )
+
+    def _retry_wait(self, attempt: int) -> int:
+        return min(120, 35 + attempt * 20)
+
     def _generate(self, input_texts: List[str]) -> List[str]:
         outputs = []
 
         for prompt in input_texts:
-            for attempt in range(5):
+            for attempt in range(8):
                 try:
                     completion = self.client.chat.completions.create(
                         model=self.cfg.model_name,
@@ -62,14 +76,23 @@ class OpenRouterGenerator(BaseGenerator):
                     )
                     break
                 except Exception as e:
-                    if "429" in str(e) or "rate" in str(e).lower():
-                        time.sleep(35 + 10 * attempt)
+                    if self._is_retryable_error(e):
+                        wait = self._retry_wait(attempt)
+                        print(f"OpenRouter temporary error. Waiting {wait}s before retry...")
+                        time.sleep(wait)
+                    elif self._is_moderation_error(e):
+                        print("OpenRouter moderation blocked a generation request. Returning Unknown.")
+                        completion = None
+                        break
                     else:
                         raise
             else:
-                raise RuntimeError("OpenRouter rate limit persisted after retries.")
+                raise RuntimeError("OpenRouter temporary error persisted after retries.")
 
-            outputs.append(self._clean_output(completion.choices[0].message.content or ""))
+            if completion is None:
+                outputs.append('{"answer": "Unknown"}')
+            else:
+                outputs.append(self._clean_output(completion.choices[0].message.content or ""))
 
         return outputs
 
@@ -95,6 +118,17 @@ class OpenRouterGenerator(BaseGenerator):
 
         return json.loads(text)
 
+    def _is_moderation_error(self, error: Exception) -> bool:
+        error_text = str(error).lower()
+        return (
+            "403" in error_text
+            and (
+                "moderation" in error_text
+                or "flagged" in error_text
+                or "sexual/minors" in error_text
+            )
+        )
+
 
     def score_document(self, question: str, answer: str, document: str) -> float:
         prompt = f"""
@@ -118,7 +152,7 @@ class OpenRouterGenerator(BaseGenerator):
     Use numbers from 0 to 1.
     """
 
-        for attempt in range(5):
+        for attempt in range(8):
             try:
                 completion = self.client.chat.completions.create(
                     model=self.cfg.model_name,
@@ -143,14 +177,17 @@ class OpenRouterGenerator(BaseGenerator):
                 break
 
             except Exception as e:
-                if "429" in str(e) or "rate" in str(e).lower():
-                    wait = 35 + attempt * 10
-                    print(f"Rate limited. Waiting {wait}s...")
+                if self._is_retryable_error(e):
+                    wait = self._retry_wait(attempt)
+                    print(f"OpenRouter temporary error. Waiting {wait}s before retry...")
                     time.sleep(wait)
+                elif self._is_moderation_error(e):
+                    print("OpenRouter moderation blocked a judge request. Using score 0.0.")
+                    return 0.0
                 else:
                     raise
         else:
-            raise RuntimeError("OpenRouter rate limit persisted after retries.")
+            raise RuntimeError("OpenRouter temporary error persisted after retries.")
 
         text = completion.choices[0].message.content
 

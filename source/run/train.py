@@ -196,7 +196,7 @@ def validate(controller, epoch, num_steps):
         QuestionStateDataset(dev_start_states),
         batch_size=cfg.batch_size, 
         shuffle=True,
-        num_workers=8,
+        num_workers=2,
         pin_memory=True,
         collate_fn=collate_question_states,
     )
@@ -245,7 +245,7 @@ def train(cfg, generator, retriever, indexer, optimizer, scheduler):
         QuestionStateDataset(start_states),
         batch_size=cfg.batch_size, 
         shuffle=True,
-        num_workers=8,
+        num_workers=2,
         pin_memory=True,
         collate_fn=collate_question_states,
     )
